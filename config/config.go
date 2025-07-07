@@ -7,12 +7,21 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type Config struct {
+type Env struct {
 	PORT             string
 	SECRET           string
 	USER_ENDPOINT    string
 	PRODUCT_ENDPOINT string
 	ORDER_ENDPOINT   string
+}
+
+type ServiceConfig struct {
+	ContextPath string
+	TargetUrl   string
+}
+
+type Config struct {
+	Services map[string]ServiceConfig
 }
 
 func init() {
@@ -22,7 +31,7 @@ func init() {
 	}
 }
 
-func GetConfig() *Config {
+func LoadEnv() Env {
 	port := os.Getenv("PORT")
 	if len(port) <= 0 {
 		log.Fatal("error while initializing env port")
@@ -44,11 +53,29 @@ func GetConfig() *Config {
 	if len(orderEP) <= 0 {
 		log.Fatal("error while initializing env orderEP")
 	}
-	return &Config{
+	return Env{
 		PORT:             port,
 		SECRET:           secret,
 		USER_ENDPOINT:    userEP,
 		PRODUCT_ENDPOINT: productEP,
 		ORDER_ENDPOINT:   orderEP,
 	}
+}
+
+func LoadConfig() *Config {
+	env := LoadEnv()
+	config := new(Config)
+	config.Services["user-service"] = ServiceConfig{
+		ContextPath: "/api/users",
+		TargetUrl:   env.USER_ENDPOINT,
+	}
+	config.Services["product-service"] = ServiceConfig{
+		ContextPath: "/api/products",
+		TargetUrl:   env.PRODUCT_ENDPOINT,
+	}
+	config.Services["order-service"] = ServiceConfig{
+		ContextPath: "/api/orders",
+		TargetUrl:   env.ORDER_ENDPOINT,
+	}
+	return config
 }
