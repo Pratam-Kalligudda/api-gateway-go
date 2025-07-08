@@ -1,81 +1,81 @@
 package config
 
 import (
+	"errors"
 	"log"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/joho/godotenv"
+	"gopkg.in/yaml.v3"
 )
 
-type Env struct {
-	PORT             string
-	SECRET           string
-	USER_ENDPOINT    string
-	PRODUCT_ENDPOINT string
-	ORDER_ENDPOINT   string
+type ServiceConfig struct {
+	Name        string  `yaml:"name"`
+	ContextPath string  `yaml:"contextPath"`
+	TargetUrl   string  `yaml:"targetUrl"`
+	Routes      []Route `yaml:"routes"`
 }
 
-type ServiceConfig struct {
-	ContextPath string
-	TargetUrl   string
+type Route struct {
+	Path         string   `yaml:"path"`
+	Methods      []string `yaml:"methods"`
+	AuthRequired bool     `yaml:"authRequired"`
+}
+
+func (s *ServiceConfig) IsAuthNeeded(path, method string) (bool, error) {
+	for _, route := range s.Routes {
+		if (route.Path == "/*" || strings.HasPrefix(path, route.Path)) && slices.Contains(route.Methods, method) {
+			return route.AuthRequired, nil
+		}
+	}
+	return false, errors.New("no route found in this service")
 }
 
 type Config struct {
-	Services map[string]ServiceConfig
+	Services []ServiceConfig `yaml:"services"`
+	SECRET   string
+	PORT     string
 }
 
 func init() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("error while initializing env : %v", err.Error())
+		log.Fatal("couldnt load env")
 	}
 }
 
-func LoadEnv() Env {
-	port := os.Getenv("PORT")
-	if len(port) <= 0 {
-		log.Fatal("error while initializing env port")
-	}
-
+func LoadConfig() (*Config, error) {
 	secret := os.Getenv("SECRET")
 	if len(secret) <= 0 {
-		log.Fatal("error while initializing env secret")
+		return nil, errors.New("no secret found")
 	}
-	userEP := os.Getenv("USER_ENDPOINT")
-	if len(userEP) <= 0 {
-		log.Fatal("error while initializing env userEP")
+
+	port := os.Getenv("PORT")
+	if len(port) <= 0 {
+		return nil, errors.New("no port found")
 	}
-	productEP := os.Getenv("PRODUCT_ENDPOINT")
-	if len(productEP) <= 0 {
-		log.Fatal("error while initializing env productEP")
+	var cfg Config
+	cfg.PORT = port
+	cfg.SECRET = secret
+	data, err := os.ReadFile("config.yml")
+	if err != nil {
+		return nil, err
 	}
-	orderEP := os.Getenv("ORDER_ENDPOINT")
-	if len(orderEP) <= 0 {
-		log.Fatal("error while initializing env orderEP")
+	err = yaml.Unmarshal(data, cfg)
+	if err != nil {
+		return nil, err
 	}
-	return Env{
-		PORT:             port,
-		SECRET:           secret,
-		USER_ENDPOINT:    userEP,
-		PRODUCT_ENDPOINT: productEP,
-		ORDER_ENDPOINT:   orderEP,
-	}
+	return &cfg, nil
 }
 
-func LoadConfig() *Config {
-	env := LoadEnv()
-	config := new(Config)
-	config.Services["user-service"] = ServiceConfig{
-		ContextPath: "/api/users",
-		TargetUrl:   env.USER_ENDPOINT,
+func (c *Config) GetUrlFromEndpoint(path string) (*ServiceConfig, error) {
+	for _, service := range c.Services {
+		if strings.HasPrefix(path, service.ContextPath) {
+			return &service, nil
+		}
 	}
-	config.Services["product-service"] = ServiceConfig{
-		ContextPath: "/api/products",
-		TargetUrl:   env.PRODUCT_ENDPOINT,
-	}
-	config.Services["order-service"] = ServiceConfig{
-		ContextPath: "/api/orders",
-		TargetUrl:   env.ORDER_ENDPOINT,
-	}
-	return config
+
+	return nil, errors.New("no matching service with that path found")
 }

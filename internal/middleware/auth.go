@@ -2,7 +2,10 @@ package middleware
 
 import (
 	"errors"
+	"strconv"
+	"strings"
 
+	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -10,15 +13,47 @@ type Auth struct {
 	secret string
 }
 
-func (a *Auth) VerifyToken(tok string) (uint, error) {
-	_, err := jwt.Parse(tok, func(t *jwt.Token) (interface{}, error) {
+func (a *Auth) AuthMiddleware(c fiber.Ctx) error {
+	headers := c.GetReqHeaders()
+	auth, exist := headers["Authentication"]
+	if !exist || len(auth) <= 0 || !strings.HasPrefix(auth[0], "Bearer") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "auth doesnt exists"})
+	}
+
+	token := strings.Split(auth[0], " ")
+	if len(token) <= 1 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "auth doesnt exists"})
+	}
+
+	uint, err := a.VerifyToken(token[1])
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "auth doesnt exists" + err.Error()})
+	}
+
+	c.Set("X-UserID")
+
+	return c.Next()
+}
+
+func (a *Auth) VerifyToken(tok string) (string, error) {
+	token, err := jwt.Parse(tok, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("invalid signing method")
 		}
 		return []byte(a.secret), nil
 	})
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-	return 0, err
+	if !token.Valid {
+		return "", errors.New("invalid token found")
+	}
+
+	claims := token.Claims.(jwt.MapClaims)
+	userIdStr, err := claims.GetSubject()
+	if err != nil {
+		return "", err
+	}
+
+	return userIdStr, nil
 }

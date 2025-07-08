@@ -1,0 +1,30 @@
+services:
+  - name: "user-service"
+    contextPath: "/api/users"
+    endpoint: "http://localhost:8001"
+    routes:
+      - path: "/login"
+        method: ["POST"]
+        authRequired: false
+      - path: "/register"
+        method: ["POST"]
+        authRequired: false
+      - path: "/*"
+        method: ["GET", "PUT", "DELETE", "PATCH"]
+        authRequired: true
+
+  - name: "product-service"
+    contextPath: "/api/products"
+    endpoint: "http://localhost:8002"
+    routes:
+      - path: "/*"
+        mehtod: ["POST","PUT","DELETE","PATCH"]
+        authRequired: true
+
+  - name: "order-service"
+    contextPath: "/api/orders"
+    endpoint: "http://localhost:8003"
+    routes:
+      - path: "/*"
+        method: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+        authRequired: true
