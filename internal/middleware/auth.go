@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"errors"
-	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -13,26 +12,32 @@ type Auth struct {
 	secret string
 }
 
-func (a *Auth) AuthMiddleware(c fiber.Ctx) error {
-	headers := c.GetReqHeaders()
-	auth, exist := headers["Authentication"]
-	if !exist || len(auth) <= 0 || !strings.HasPrefix(auth[0], "Bearer") {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "auth doesnt exists"})
+func NewAuth(secret string) *Auth {
+	return &Auth{secret: secret}
+}
+
+func (a *Auth) AuthMiddleware() fiber.Handler {
+	return func(c fiber.Ctx) error {
+		headers := c.GetReqHeaders()
+		auth, exist := headers["Authentication"]
+		if !exist || len(auth) <= 0 || !strings.HasPrefix(auth[0], "Bearer") {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "auth doesnt exists"})
+		}
+
+		token := strings.Split(auth[0], " ")
+		if len(token) <= 1 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "auth doesnt exists"})
+		}
+
+		userId, err := a.VerifyToken(token[1])
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "auth doesnt exists" + err.Error()})
+		}
+
+		c.Request().Header.Add("X-User-Id", userId)
+
+		return c.Next()
 	}
-
-	token := strings.Split(auth[0], " ")
-	if len(token) <= 1 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "auth doesnt exists"})
-	}
-
-	uint, err := a.VerifyToken(token[1])
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "auth doesnt exists" + err.Error()})
-	}
-
-	c.Set("X-UserID")
-
-	return c.Next()
 }
 
 func (a *Auth) VerifyToken(tok string) (string, error) {
