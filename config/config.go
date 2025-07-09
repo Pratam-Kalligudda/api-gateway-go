@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -22,15 +21,6 @@ type Route struct {
 	Path         string   `yaml:"path"`
 	Methods      []string `yaml:"methods"`
 	AuthRequired bool     `yaml:"authRequired"`
-}
-
-func (s *ServiceConfig) IsAuthNeeded(path, method string) (bool, error) {
-	for _, route := range s.Routes {
-		if (route.Path == "/*" || strings.HasPrefix(path, route.Path)) && slices.Contains(route.Methods, method) {
-			return route.AuthRequired, nil
-		}
-	}
-	return false, errors.New("no route found in this service")
 }
 
 type Config struct {
@@ -59,11 +49,11 @@ func LoadConfig() (*Config, error) {
 	var cfg Config
 	cfg.PORT = port
 	cfg.SECRET = secret
-	data, err := os.ReadFile("config.yml")
+	data, err := os.ReadFile("conf.yml")
 	if err != nil {
 		return nil, err
 	}
-	err = yaml.Unmarshal(data, cfg)
+	err = yaml.Unmarshal(data, &cfg)
 	if err != nil {
 		return nil, err
 	}

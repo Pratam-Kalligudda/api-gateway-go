@@ -21,11 +21,11 @@ func main() {
 	app := fiber.New()
 	handler := server.NewProxyHandler(service)
 	auth := middleware.NewAuth(cfg.SECRET)
-	server.SetupRoutes(app,auth, cfg, handler)
+	server.SetupRoutes(app, auth, cfg, handler)
 
-	log.Println("Starting API Gateway on :8080")
+	log.Println("Starting API Gateway on " + cfg.PORT)
 
-	if err := app.Listen(":8080"); err != nil {
+	if err := app.Listen(cfg.PORT); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
